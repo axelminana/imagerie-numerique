@@ -68,7 +68,7 @@ def test_list_candidate_images_filtre_le_cercle(monkeypatch):
     monkeypatch.setattr(mc, "_get", lambda *a, **k: SimpleNamespace(status_code=200, content=b"x"))
     monkeypatch.setattr(mc, "_decode_tile", lambda content, tile: features)
 
-    images = mc.list_candidate_images(LAT, LON, 200, token="t")
+    images = mc.list_candidate_images(LAT, LON, 200, token="t", source="tiles")
 
     # l'image à 260 m est hors du cercle, le doublon de l'image 1 est ignoré
     assert [img["image_id"] for img in images] == ["1", "2"]
@@ -78,7 +78,7 @@ def test_list_candidate_images_filtre_le_cercle(monkeypatch):
 def test_token_refuse_donne_un_message_clair(monkeypatch):
     monkeypatch.setattr(mc, "_get", lambda *a, **k: SimpleNamespace(status_code=401, content=b""))
     with pytest.raises(RuntimeError, match="refuse le token"):
-        mc.list_candidate_images(LAT, LON, 200, token="mauvais")
+        mc.list_candidate_images(LAT, LON, 200, token="mauvais", source="tiles")
 
 
 # ---------------------------------------------------------------------------
@@ -228,7 +228,87 @@ def test_reponse_invalide_message_explicite(monkeypatch):
                                headers={"Content-Type": "text/html"})
     monkeypatch.setattr(mc, "_get", lambda *a, **k: response)
     with pytest.raises(RuntimeError) as error:
-        mc.list_candidate_images(LAT, LON, 200, token="secret123")
+        mc.list_candidate_images(LAT, LON, 200, token="secret123", source="tiles")
     message = str(error.value)
     assert "text/html" in message and "Acces bloque" in message
     assert "secret123" not in message
+
+
+
+# ---------------------------------------------------------------------------
+# Liste par l'API Graph (source par défaut)
+# ---------------------------------------------------------------------------
+class FakeJsonResponse:
+    """Réponse simulée de l'API Graph."""
+
+    def __init__(self, payload=None, status_code=200, body=None, content_type="application/json"):
+        self.payload, self.status_code = payload, status_code
+        self.content = body if body is not None else b"{}"
+        self.headers = {"Content-Type": content_type}
+
+    def json(self):
+        if self.payload is None:
+            raise ValueError("pas du JSON")
+        return self.payload
+
+
+def graph_item(image_id, north_m, seq="s1"):
+    return {"id": str(image_id), "geometry": {"type": "Point",
+                                              "coordinates": [LON, LAT + north_m * DEG_PER_M]},
+            "sequence": seq, "captured_at": 1_700_000_000_000, "compass_angle": 10.0,
+            "is_pano": False, "thumb_2048_url": f"https://exemple/{image_id}.jpg"}
+
+
+def test_graph_filtre_le_cercle_et_garde_la_vignette(monkeypatch):
+    payload = {"data": [graph_item(1, 50), graph_item(2, 150), graph_item(3, 260)]}
+    monkeypatch.setattr(mc, "_get", lambda *a, **k: FakeJsonResponse(payload))
+    images = mc.list_candidate_images(LAT, LON, 200, token="t")
+    assert [img["image_id"] for img in images] == ["1", "2"]
+    assert images[0]["thumb_2048_url"] == "https://exemple/1.jpg"
+    assert images[0]["sequence_id"] == "s1"
+
+
+def test_graph_decoupe_la_boite_si_limite_atteinte(monkeypatch):
+    monkeypatch.setattr(config, "MAPILLARY_GRAPH_LIMIT", 2)
+    calls = []
+
+    def fake_get(url, session, **kwargs):
+        calls.append(url)
+        if len(calls) == 1:                      # première boîte : limite atteinte
+            return FakeJsonResponse({"data": [graph_item(1, 10), graph_item(2, 20)]})
+        return FakeJsonResponse({"data": [graph_item(len(calls), 10)]})
+
+    monkeypatch.setattr(mc, "_get", fake_get)
+    images = mc.list_candidate_images(LAT, LON, 200, token="t")
+    assert len(calls) == 5                       # la boîte puis ses quatre quarts
+    assert {img["image_id"] for img in images} == {"2", "3", "4", "5"}
+
+
+def test_graph_erreur_json_lisible(monkeypatch):
+    payload = {"error": {"message": "Invalid OAuth access token.", "code": 190}}
+    monkeypatch.setattr(mc, "_get", lambda *a, **k: FakeJsonResponse(payload, status_code=400))
+    with pytest.raises(RuntimeError, match="Invalid OAuth access token"):
+        mc.list_candidate_images(LAT, LON, 200, token="t")
+
+
+def test_graph_page_html_lisible(monkeypatch):
+    response = FakeJsonResponse(None, body=b"<!DOCTYPE html><html id='facebook'>secret</html>",
+                                content_type="text/html")
+    monkeypatch.setattr(mc, "_get", lambda *a, **k: response)
+    with pytest.raises(RuntimeError) as error:
+        mc.list_candidate_images(LAT, LON, 200, token="secret")
+    assert "text/html" in str(error.value) and "secret" not in str(error.value)
+
+
+def test_collect_reutilise_la_vignette_de_l_api_graph(tmp_path, monkeypatch):
+    candidates = [dict(make_image("1", "s1", 0, 1_700_000_000_000),
+                       thumb_2048_url="https://exemple/1.jpg")]
+    monkeypatch.setenv(config.MAPILLARY_TOKEN_ENV, "token-de-test")
+    monkeypatch.setattr(mc, "list_candidate_images", lambda *a, **k: candidates)
+    monkeypatch.setattr(mc, "fetch_image_info",
+                        lambda *a, **k: pytest.fail("pas de seconde requête attendue"))
+    urls = []
+    monkeypatch.setattr(mc, "download_image",
+                        lambda url, path, session=None: urls.append(url) or True)
+    mc.collect(LAT, LON, 200, tmp_path, spacing_m=15)
+    assert urls == ["https://exemple/1.jpg"]
