@@ -1,0 +1,26 @@
+# Bornes minimales provisoires : figer les versions exactes avec
+# "pip freeze > requirements.txt" une fois l'environnement validé sur GPU (R1).
+
+# Collecte Mapillary
+requests>=2.31
+mercantile>=1.2
+vt2geojson>=0.2
+tqdm>=4.66
+python-dotenv>=1.0
+
+# Données, statistiques, graphiques
+numpy>=1.26
+pandas>=2.1
+scipy>=1.11
+matplotlib>=3.8
+opencv-python>=4.8
+pillow>=10.0
+
+# Modèles (installer torch selon la version CUDA du GPU : https://pytorch.org)
+torch>=2.2
+ultralytics>=8.3
+transformers>=4.44
+accelerate>=0.33
+
+# Tests
+pytest>=8.0
