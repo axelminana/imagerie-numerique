@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gzip
 import logging
 import math
 import os
@@ -119,6 +120,9 @@ def _check_auth(response: requests.Response) -> None:
 def _decode_tile(content: bytes, tile) -> list[dict]:
     """Décode une tuile vectorielle et retourne les entités de la couche "image"."""
     from vt2geojson.tools import vt_bytes_to_geojson
+    # certaines tuiles arrivent compressées en gzip sans que requests le sache
+    if content[:2] == b"\x1f\x8b":
+        content = gzip.decompress(content)
     geojson = vt_bytes_to_geojson(content, tile.x, tile.y, tile.z,
                                   layer=config.MAPILLARY_TILE_LAYER)
     return geojson.get("features", [])
@@ -170,7 +174,19 @@ def list_candidate_images(lat: float, lon: float, radius_m: float, token: str,
                         tile.z, tile.x, tile.y, response.status_code)
             continue
 
-        for feature in _decode_tile(response.content, tile):
+        try:
+            features = _decode_tile(response.content, tile)
+        except Exception as error:  # DecodeError de protobuf, gzip invalide...
+            preview = response.content[:300].decode("utf-8", errors="replace").replace(token, "<token>")
+            raise RuntimeError(
+                f"La tuile {tile.z}/{tile.x}/{tile.y} n'est pas une tuile vectorielle valide "
+                f"(code HTTP {response.status_code}, "
+                f"type {response.headers.get('Content-Type', 'inconnu')}, "
+                f"encodage {response.headers.get('Content-Encoding', 'aucun')}). "
+                f"Début de la réponse : {preview!r}"
+            ) from error
+
+        for feature in features:
             props = feature.get("properties", {})
             image_id = str(props.get("id", ""))
             if not image_id or image_id in images:

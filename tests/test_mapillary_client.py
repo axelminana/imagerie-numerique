@@ -204,3 +204,31 @@ def test_decode_tile_reelle():
     lon, lat = features[0]["geometry"]["coordinates"][:2]
     assert bounds.west < lon < bounds.east and bounds.south < lat < bounds.north
     assert features[0]["properties"]["id"] == 42
+
+
+def test_decode_tile_compressee_gzip():
+    """Une tuile compressée en gzip est décompressée avant le décodage."""
+    import gzip
+
+    import mapbox_vector_tile
+    import mercantile
+
+    tile = mercantile.tile(LON, LAT, config.MAPILLARY_TILE_ZOOM)
+    content = gzip.compress(mapbox_vector_tile.encode([{
+        "name": "image",
+        "features": [{"geometry": "POINT(2048 2048)", "properties": {"id": 7}}],
+    }]))
+    assert mc._decode_tile(content, tile)[0]["properties"]["id"] == 7
+
+
+def test_reponse_invalide_message_explicite(monkeypatch):
+    """Une réponse qui n'est pas une tuile donne un message lisible, sans le token."""
+    body = b"<html>Acces bloque, token=secret123</html>"
+    response = SimpleNamespace(status_code=200, content=body,
+                               headers={"Content-Type": "text/html"})
+    monkeypatch.setattr(mc, "_get", lambda *a, **k: response)
+    with pytest.raises(RuntimeError) as error:
+        mc.list_candidate_images(LAT, LON, 200, token="secret123")
+    message = str(error.value)
+    assert "text/html" in message and "Acces bloque" in message
+    assert "secret123" not in message
