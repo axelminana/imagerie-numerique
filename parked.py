@@ -41,6 +41,22 @@ def mark_parked(detections: list[dict], zone_dir: Path,
                 device: str = "cuda") -> list[dict]:
     """Remplit parked et parked_method pour les détections de config.VEHICLE_CATEGORIES.
 
+    Les piétons gardent des valeurs vides. La stratégie "none" ne marque aucun
+    véhicule comme stationné : elle sert de référence et permet de faire tourner
+    le pipeline en attendant les autres stratégies.
     Retourne la liste de détections complétée.
     """
-    raise NotImplementedError("TODO (R4) : tri des véhicules stationnés")
+    if strategy not in config.PARKED_STRATEGIES:
+        raise ValueError(f"stratégie inconnue : {strategy!r} (choix : {config.PARKED_STRATEGIES})")
+    if strategy != "none":
+        # TODO (R4) : appeler parked_by_geometry ou parked_by_clip pour chaque véhicule
+        raise NotImplementedError(
+            f"stratégie {strategy!r} pas encore codée (R4) : utilisez --parked none en attendant"
+        )
+
+    for det in detections:
+        if det["category"] in config.VEHICLE_CATEGORIES:
+            det["parked"], det["parked_method"] = False, strategy
+        else:
+            det["parked"], det["parked_method"] = "", ""
+    return detections

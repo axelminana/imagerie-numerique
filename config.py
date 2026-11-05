@@ -120,6 +120,7 @@ CLIP_NEGATIVE_PROMPTS: list[str] = [
     "a blurry photo",
 ]
 CLIP_KEEP_THRESHOLD = 0.5                   # à régler
+DEFAULT_FILTER = "none"                     # provisoire : "blip2" ou "clip" quand R2 les aura codés
 
 # ---------------------------------------------------------------------------
 # Étape 3 : détection YOLO
@@ -128,8 +129,12 @@ DEFAULT_DETECTOR = "yolo11s.pt"
 DEFAULT_CONF = 0.4                          # à régler entre 0,25 et 0,5
 DEFAULT_IMGSZ = 1280
 RIDER_OVERLAP_THRESHOLD = 0.3               # part de la boîte de la personne couverte
+RIDER_CAPACITY: dict[str, int] = {"deux_roues": 1, "deux_roues_motorises": 2}  # conducteurs max
+YOLO_BATCH_SIZE = 8                         # images par appel à YOLO
+N_DETECTION_EXAMPLES = 10                   # images annotées sauvegardées pour la soutenance
+EXAMPLES_DIR = "exemples_detection"
 PARKED_STRATEGIES: tuple[str, ...] = ("none", "geometry", "clip")
-DEFAULT_PARKED_STRATEGY = "geometry"        # à choisir le 10/12
+DEFAULT_PARKED_STRATEGY = "none"            # provisoire : "geometry" ou "clip" quand R4 les aura codées
 
 # ---------------------------------------------------------------------------
 # Étape 5 : analyse

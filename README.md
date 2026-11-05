@@ -25,6 +25,10 @@ cp .env.example .env               # puis y mettre son propre token Mapillary
 # pipeline complet sur une zone
 python main.py -lat 45.800413 -lon 3.108813 -o report.csv --zone carrefour_pistes
 
+# essai rapide sur CPU avec le plus petit modèle YOLO
+python main.py -lat 45.800413 -lon 3.108813 --zone carrefour_pistes --max-images 20 \
+               --detector yolo11n.pt --device cpu
+
 # relancer seulement certaines étapes
 python main.py -lat 45.800413 -lon 3.108813 --zone carrefour_pistes --steps detect,report
 
@@ -67,3 +71,15 @@ section 5 du plan de travail.
 - Code commenté en français, une docstring par fonction, annotations de type.
 - Sources ajoutées dans `references.md` et usages d'IA générative dans `usage_ia.md`, au fur et à mesure.
 - Tests : `python -m pytest`.
+
+## État d'avancement
+
+| Étape | État |
+|---|---|
+| 1. Collecte | Fonctionnelle (API Graph, liste figée par zone) |
+| 2. Filtrage | Seulement `--filter none` ; BLIP-2 et CLIP à coder (R2) |
+| 3. Détection | Fonctionnelle (YOLO, regroupement des classes, conducteurs de deux-roues) |
+| 3. Stationnés | Seulement `--parked none` ; stratégies `geometry` et `clip` à coder (R4) |
+| 4. Rapport | Fonctionnel |
+| 5. Analyse | À coder (R5) |
+| Évaluation | À coder (R4) |

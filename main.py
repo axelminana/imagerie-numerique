@@ -45,9 +45,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="distance minimale en mètres entre deux images d'une séquence")
     parser.add_argument("--max-images", type=int, default=None,
                         help="nombre maximal d'images (tests rapides)")
-    parser.add_argument("--filter", dest="filter_method", default="clip",
+    parser.add_argument("--filter", dest="filter_method", default=config.DEFAULT_FILTER,
                         choices=("blip2", "clip", "none"),
-                        help="méthode de filtrage des images (défaut provisoire : clip)")
+                        help="méthode de filtrage des images (défaut provisoire : %(default)s)")
     parser.add_argument("--detector", default=config.DEFAULT_DETECTOR,
                         help="poids YOLO à utiliser (défaut : %(default)s)")
     parser.add_argument("--conf", type=float, default=config.DEFAULT_CONF,
