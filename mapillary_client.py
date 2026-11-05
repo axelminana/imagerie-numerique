@@ -85,6 +85,10 @@ def get_token() -> str:
     return token
 
 
+class TransientError(RuntimeError):
+    """Erreur réseau ou serveur qui persiste après toutes les tentatives."""
+
+
 def _get(url: str, session: requests.Session, headers: dict | None = None,
          stream: bool = False) -> requests.Response:
     """Requête GET avec délai maximal et nouvelles tentatives.
@@ -106,7 +110,7 @@ def _get(url: str, session: requests.Session, headers: dict | None = None,
             last_error = error
         if attempt < config.REQUEST_RETRIES - 1:
             time.sleep(2 ** attempt)
-    raise RuntimeError(f"échec après {config.REQUEST_RETRIES} tentatives : {last_error}")
+    raise TransientError(f"échec après {config.REQUEST_RETRIES} tentatives : {last_error}")
 
 
 def _new_session() -> requests.Session:
@@ -207,9 +211,55 @@ def _graph_images_in_bbox(bbox: tuple[float, float, float, float], token: str,
     return items
 
 
+def _grid(bbox: tuple[float, float, float, float],
+          cell_m: float) -> list[tuple[float, float, float, float]]:
+    """Découpe une boîte en cases d'environ cell_m mètres de côté."""
+    west, south, east, north = bbox
+    mid_lat = (south + north) / 2
+    cell_lat = cell_m / METERS_PER_DEGREE_LAT
+    cell_lon = cell_m / (METERS_PER_DEGREE_LAT * math.cos(math.radians(mid_lat)))
+    n_lat = max(1, math.ceil((north - south) / cell_lat - 1e-9))
+    n_lon = max(1, math.ceil((east - west) / cell_lon - 1e-9))
+    step_lat, step_lon = (north - south) / n_lat, (east - west) / n_lon
+    return [(west + i * step_lon, south + j * step_lat,
+             west + (i + 1) * step_lon, south + (j + 1) * step_lat)
+            for j in range(n_lat) for i in range(n_lon)]
+
+
 def _records_from_graph(bbox, token: str, session: requests.Session):
-    """Images de la boîte, lues avec l'API Graph (source par défaut)."""
-    for item in _graph_images_in_bbox(bbox, token, session):
+    """Images de la boîte, lues avec l'API Graph (source par défaut).
+
+    L'API renvoie une partie variable des images d'une requête à l'autre.
+    On interroge donc la boîte en petites cases (config.MAPILLARY_CELL_M), en
+    plusieurs passes, et on fusionne les résultats. On s'arrête dès qu'une passe
+    apporte moins de config.MAPILLARY_STABLE_RATIO de nouvelles images
+    (au moins deux passes, au plus config.MAPILLARY_MAX_PASSES).
+    """
+    from tqdm import tqdm
+
+    cells = _grid(bbox, config.MAPILLARY_CELL_M)
+    found: dict[str, dict] = {}
+    for n_pass in range(1, config.MAPILLARY_MAX_PASSES + 1):
+        before = len(found)
+        for cell in tqdm(cells, desc=f"Passe {n_pass}", unit="case", leave=False):
+            try:
+                items = _graph_images_in_bbox(cell, token, session)
+            except TransientError as error:
+                log.warning("Case ignorée pendant cette passe : %s", error)
+                continue
+            for item in items:
+                if item.get("id") is not None:
+                    found.setdefault(str(item["id"]), item)
+        added = len(found) - before
+        log.info("Passe %d sur %d cases : %d nouvelle(s) image(s), %d dans la boîte",
+                 n_pass, len(cells), added, len(found))
+        if n_pass >= 2 and added <= config.MAPILLARY_STABLE_RATIO * len(found):
+            break
+    else:
+        log.warning("La liste ne s'est pas stabilisée en %d passes : "
+                    "quelques images peuvent manquer", config.MAPILLARY_MAX_PASSES)
+
+    for item in found.values():
         coordinates = (item.get("geometry") or {}).get("coordinates")
         if not coordinates:
             continue
@@ -405,6 +455,46 @@ def write_metadata(rows: list[dict], path: Path) -> None:
         writer.writerows(rows)
 
 
+def _parse_bool(value: str):
+    """Relit un booléen écrit dans un CSV ("True", "False" ou vide)."""
+    return {"true": True, "false": False}.get(str(value).strip().lower())
+
+
+def _iso_to_ms(value: str):
+    """Inverse de _ms_to_iso : texte ISO 8601 vers millisecondes (None si vide)."""
+    if not value:
+        return None
+    try:
+        return int(datetime.fromisoformat(value).timestamp() * 1000)
+    except ValueError:
+        return None
+
+
+def load_candidates(metadata_path: Path, lat: float, lon: float, radius_m: float) -> list[dict]:
+    """Relit la liste des images candidates d'un metadata.csv existant.
+
+    Les distances sont recalculées par rapport au centre donné et seules les
+    images du cercle sont gardées. Les URL de vignettes, qui expirent, ne sont
+    pas conservées : elles seront redemandées à l'API Graph si besoin.
+    """
+    candidates = []
+    with open(metadata_path, encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            img_lat, img_lon = float(row["lat"]), float(row["lon"])
+            distance = haversine_m(lat, lon, img_lat, img_lon)
+            if distance > radius_m:
+                continue
+            candidates.append({
+                "image_id": row["image_id"], "sequence_id": row["sequence_id"],
+                "lat": img_lat, "lon": img_lon, "distance_m": round(distance, 1),
+                "captured_at_ms": _iso_to_ms(row["captured_at"]),
+                "compass_angle": float(row["compass_angle"]) if row["compass_angle"] else None,
+                "is_pano": _parse_bool(row["is_pano"]),
+                "thumb_2048_url": None,
+            })
+    return sorted(candidates, key=lambda img: img["distance_m"])
+
+
 def count_images(lat: float, lon: float, radius_m: float = config.DEFAULT_RADIUS_M,
                  spacing_m: float = config.DEFAULT_SPACING_M,
                  source: str = config.MAPILLARY_SOURCE) -> tuple[int, int]:
@@ -421,12 +511,17 @@ def count_images(lat: float, lon: float, radius_m: float = config.DEFAULT_RADIUS
 
 def collect(lat: float, lon: float, radius_m: float, zone_dir: Path,
             spacing_m: float = config.DEFAULT_SPACING_M,
-            max_images: int | None = None, seed: int = config.RANDOM_SEED) -> Path:
+            max_images: int | None = None, seed: int = config.RANDOM_SEED,
+            refresh: bool = False) -> Path:
     """Exécute toute l'étape 1 et retourne le chemin de metadata.csv.
 
     metadata.csv contient toutes les images candidates du cercle ; la colonne
     selected indique celles qui ont été retenues et téléchargées, et path leur
     chemin relatif au dossier de la zone (images/<image_id>.jpg).
+
+    Si metadata.csv existe déjà, sa liste d'images candidates est réutilisée,
+    ce qui rend la sélection reproductible malgré les réponses variables de
+    l'API. refresh=True force une nouvelle interrogation de l'API.
     """
     from tqdm import tqdm
 
@@ -436,8 +531,14 @@ def collect(lat: float, lon: float, radius_m: float, zone_dir: Path,
     images_dir = zone_dir / config.IMAGES_DIR
     images_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. images candidates dans le cercle
-    candidates = list_candidate_images(lat, lon, radius_m, token, session)
+    # 1. images candidates dans le cercle (liste figée si elle existe déjà)
+    metadata_path = zone_dir / config.METADATA_FILE
+    if metadata_path.exists() and not refresh:
+        candidates = load_candidates(metadata_path, lat, lon, radius_m)
+        log.info("Liste reprise de %s : %d image(s) dans le cercle "
+                 "(--refresh-list pour interroger à nouveau l'API)", metadata_path, len(candidates))
+    else:
+        candidates = list_candidate_images(lat, lon, radius_m, token, session)
     if not candidates:
         log.warning("Aucune image Mapillary dans un rayon de %s m : zone à changer ?", radius_m)
 
@@ -492,7 +593,6 @@ def collect(lat: float, lon: float, radius_m: float, zone_dir: Path,
             n_ok += 1
 
     # 5. écriture de metadata.csv (les plus proches du centre en premier)
-    metadata_path = zone_dir / config.METADATA_FILE
     ordered = sorted(rows.values(), key=lambda r: r["distance_m"])
     for row in ordered:
         if row.get("is_pano") is None:

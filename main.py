@@ -60,6 +60,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="stratégie de détection des véhicules stationnés")
     parser.add_argument("--keep-parked", action="store_true",
                         help="compter aussi les véhicules stationnés dans le rapport")
+    parser.add_argument("--refresh-list", action="store_true",
+                        help="interroger à nouveau l'API au lieu de réutiliser metadata.csv")
     parser.add_argument("--skip-download", action="store_true",
                         help="réutiliser les images déjà téléchargées")
     parser.add_argument("--steps", default=",".join(ALL_STEPS),
@@ -107,7 +109,7 @@ def main(argv: list[str] | None = None) -> int:
         import mapillary_client
         mapillary_client.collect(
             lat=args.lat, lon=args.lon, radius_m=args.radius, zone_dir=zone_dir,
-            spacing_m=args.spacing, max_images=args.max_images,
+            spacing_m=args.spacing, max_images=args.max_images, refresh=args.refresh_list,
         )
 
     if "filter" in args.steps:

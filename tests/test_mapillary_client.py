@@ -279,9 +279,73 @@ def test_graph_decoupe_la_boite_si_limite_atteinte(monkeypatch):
         return FakeJsonResponse({"data": [graph_item(len(calls), 10)]})
 
     monkeypatch.setattr(mc, "_get", fake_get)
-    images = mc.list_candidate_images(LAT, LON, 200, token="t")
+    items = mc._graph_images_in_bbox(mc.bbox_from_radius(LAT, LON, 200), "t", None)
     assert len(calls) == 5                       # la boîte puis ses quatre quarts
-    assert {img["image_id"] for img in images} == {"2", "3", "4", "5"}
+    assert {item["id"] for item in items} == {"2", "3", "4", "5"}
+
+
+def test_grille_couvre_la_boite():
+    bbox = mc.bbox_from_radius(LAT, LON, 200)
+    cells = mc._grid(bbox, 50)
+    assert len(cells) == 64                      # 400 m de côté / 50 m = 8 x 8 cases
+    assert cells[0][:2] == pytest.approx(bbox[:2])
+    assert cells[-1][2:] == pytest.approx(bbox[2:])
+    west, south, east, north = cells[0]
+    assert mc.haversine_m(south, west, south, east) <= 50.5
+    assert mc.haversine_m(south, west, north, west) <= 50.5
+
+
+def test_passes_fusionnent_jusqu_a_stabilite(monkeypatch):
+    monkeypatch.setattr(config, "MAPILLARY_CELL_M", 10_000)   # une seule case
+    answers = iter([[graph_item(1, 10), graph_item(2, 20)],   # passe 1
+                    [graph_item(2, 20), graph_item(3, 30)],   # passe 2 : une nouvelle
+                    [graph_item(3, 30)],                      # passe 3 : rien de neuf
+                    [graph_item(4, 40)]])                     # jamais demandée
+    monkeypatch.setattr(mc, "_graph_images_in_bbox", lambda *a, **k: next(answers))
+    images = mc.list_candidate_images(LAT, LON, 200, token="t")
+    assert {img["image_id"] for img in images} == {"1", "2", "3"}
+
+
+def test_case_en_echec_ignoree(monkeypatch):
+    monkeypatch.setattr(config, "MAPILLARY_CELL_M", 10_000)
+    calls = []
+
+    def fake(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            raise mc.TransientError("échec après 3 tentatives")
+        return [graph_item(1, 10)]
+
+    monkeypatch.setattr(mc, "_graph_images_in_bbox", fake)
+    images = mc.list_candidate_images(LAT, LON, 200, token="t")
+    assert [img["image_id"] for img in images] == ["1"]
+
+
+def test_collect_reutilise_la_liste_existante(tmp_path, monkeypatch):
+    candidates = [make_image(str(i), f"s{i}", i, 1_700_000_000_000 + i) for i in range(10)]
+    monkeypatch.setenv(config.MAPILLARY_TOKEN_ENV, "token-de-test")
+    monkeypatch.setattr(mc, "fetch_image_info",
+                        lambda i, t, session=None: {"thumb_2048_url": "u", "is_pano": False})
+    monkeypatch.setattr(mc, "download_image", lambda url, path, session=None: True)
+
+    def selected(path):
+        with open(path, encoding="utf-8") as handle:
+            return {r["image_id"] for r in csv.DictReader(handle) if r["selected"] == "True"}
+
+    monkeypatch.setattr(mc, "list_candidate_images", lambda *a, **k: candidates)
+    first = selected(mc.collect(LAT, LON, 200, tmp_path, spacing_m=0, max_images=4))
+
+    # seconde exécution : l'API n'est plus interrogée, la sélection est identique
+    monkeypatch.setattr(mc, "list_candidate_images",
+                        lambda *a, **k: pytest.fail("la liste aurait dû être reprise"))
+    assert selected(mc.collect(LAT, LON, 200, tmp_path, spacing_m=0, max_images=4)) == first
+
+    # avec refresh, l'API est de nouveau interrogée
+    asked = []
+    monkeypatch.setattr(mc, "list_candidate_images",
+                        lambda *a, **k: asked.append(1) or candidates)
+    mc.collect(LAT, LON, 200, tmp_path, spacing_m=0, max_images=4, refresh=True)
+    assert asked == [1]
 
 
 def test_graph_erreur_json_lisible(monkeypatch):
