@@ -34,6 +34,9 @@ python analysis.py --zones data/zone_a data/zone_b data/zone_c --out figures/
 # évaluation sur le jeu annoté
 python evaluate.py --zone data/carrefour_pistes --split test
 
+# compter les images disponibles autour d'un point (choix des zones)
+python mapillary_client.py -lat 45.800413 -lon 3.108813 --radius 200
+
 # aide complète
 python main.py -h
 ```
