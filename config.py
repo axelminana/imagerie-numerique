@@ -79,6 +79,15 @@ MAPILLARY_TILE_URL = (
 )
 MAPILLARY_GRAPH_URL = "https://graph.mapillary.com/{image_id}"
 MAPILLARY_IMAGE_FIELDS = "thumb_2048_url,captured_at,compass_angle,is_pano"
+MAPILLARY_GRAPH_IMAGES_URL = "https://graph.mapillary.com/images"
+MAPILLARY_LIST_FIELDS = "id,geometry,sequence,captured_at,compass_angle,is_pano,thumb_2048_url"
+MAPILLARY_GRAPH_LIMIT = 2000                # maximum d'images par requête /images
+MAPILLARY_MAX_SPLIT_DEPTH = 4               # découpages successifs de la boîte au maximum
+MAPILLARY_CELL_M = 50                       # côté des cases interrogées séparément
+MAPILLARY_MAX_PASSES = 5                    # passes au maximum sur toutes les cases
+MAPILLARY_STABLE_RATIO = 0.01               # arrêt si une passe ajoute moins de 1 % d'images
+MAPILLARY_SOURCE = "graph"                  # "graph" ou "tiles" (méthode de test_student.py)
+USER_AGENT = "projet-imagerie-numerique/1.0 (Polytech Clermont)"
 MAPILLARY_TILE_ZOOM = 14                    # seul niveau de zoom servi par l'API
 MAPILLARY_TILE_LAYER = "image"
 
