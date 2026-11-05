@@ -1,0 +1,29 @@
+# Secrets
+.env
+
+# Données et résultats (partagés par le Drive, pas par Git)
+data/
+figures/
+*.jpg
+*.jpeg
+*.png
+!docs/**/*.png
+
+# Poids des modèles
+*.pt
+*.pth
+*.safetensors
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Éditeurs et systèmes
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
