@@ -45,6 +45,26 @@ python mapillary_client.py -lat 45.800413 -lon 3.108813 --radius 200
 python main.py -h
 ```
 
+## Filtre (étape 2)
+
+```bash
+# filtre seul sur une zone déjà collectée
+python filtering.py --zone data/carrefour_pistes --method clip
+python filtering.py --zone data/carrefour_pistes --method blip2
+
+# toutes les variantes (3 questions BLIP-2, question de rejet, score CLIP)
+# dans filter_variants.csv, pour choisir la règle sur le jeu annoté
+python filtering.py --zone data/carrefour_pistes --variants
+```
+
+Les modèles sont téléchargés au premier lancement depuis Hugging Face :
+environ 1,7 Go pour CLIP (`clip-vit-large-patch14`) et 15 Go pour BLIP-2
+(`blip2-opt-2.7b`). Pour les mettre sur un disque local plutôt que dans le
+profil réseau, définir la variable `HF_HOME` avant de lancer, par exemple
+`$env:HF_HOME = "D:\hf_cache"` sous PowerShell. BLIP-2 demande un GPU d'au
+moins 10 Go en float16 ; avec moins, mettre `BLIP2_LOAD_8BIT = True` dans
+`config.py` et installer `bitsandbytes`.
+
 ## Organisation
 
 | Fichier | Étape | Rôle |
@@ -77,7 +97,7 @@ section 5 du plan de travail.
 | Étape | État |
 |---|---|
 | 1. Collecte | Fonctionnelle (API Graph, liste figée par zone) |
-| 2. Filtrage | Seulement `--filter none` ; BLIP-2 et CLIP à coder (R2) |
+| 2. Filtrage | BLIP-2 et CLIP codés, à régler sur le jeu annoté (`--filter none` reste le défaut) |
 | 3. Détection | Fonctionnelle (YOLO, regroupement des classes, conducteurs de deux-roues) |
 | 3. Stationnés | Seulement `--parked none` ; stratégies `geometry` et `clip` à coder (R4) |
 | 4. Rapport | Fonctionnel |
