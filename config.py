@@ -113,10 +113,13 @@ BLIP2_LOAD_8BIT = False                     # True si le GPU a moins de 10 Go (b
 BLIP2_MAX_NEW_TOKENS = 5                    # réponse courte : "yes" ou "no"
 
 CLIP_MODEL = "openai/clip-vit-large-patch14"
+# Les descriptions positives décrivent le point de vue, pas la présence de trafic :
+# une route vide doit être gardée (elle compte avec des zéros dans le rapport).
 CLIP_POSITIVE_PROMPTS: list[str] = [
-    "a photo of a street with traffic taken from the road",
+    "a photo of a street taken from the road",
     "a city street seen from the sidewalk",
     "a road seen from a car dashboard camera",
+    "an empty road with no cars",
 ]
 CLIP_NEGATIVE_PROMPTS: list[str] = [
     "a parking lot full of parked cars",
