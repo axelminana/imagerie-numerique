@@ -142,3 +142,23 @@ DEFAULT_PARKED_STRATEGY = "none"            # provisoire : "geometry" ou "clip" 
 RANDOM_SEED = 42
 N_BOOTSTRAP = 1000
 CONFIDENCE_LEVEL = 0.95
+
+# Libellés et couleurs des catégories dans les graphiques (ordre fixe : une
+# catégorie garde sa couleur d'un graphique à l'autre). Palette vérifiée pour
+# les daltonismes ; les contrastes faibles sont compensés par des étiquettes.
+CATEGORY_LABELS: dict[str, str] = {
+    "pietons": "Piétons",
+    "deux_roues": "Vélos",
+    "deux_roues_motorises": "Deux-roues motorisés",
+    "vehicules_legers": "Véhicules légers",
+    "bus": "Bus",
+    "camions": "Camions",
+}
+CATEGORY_COLORS: dict[str, str] = {
+    "pietons": "#257de0",
+    "deux_roues": "#f47230",
+    "deux_roues_motorises": "#00b894",
+    "vehicules_legers": "#f2a600",
+    "bus": "#ee7fac",
+    "camions": "#008a17",
+}

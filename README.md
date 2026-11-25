@@ -33,7 +33,7 @@ python main.py -lat 45.800413 -lon 3.108813 --zone carrefour_pistes --max-images
 python main.py -lat 45.800413 -lon 3.108813 --zone carrefour_pistes --steps detect,report
 
 # analyse comparée de plusieurs zones
-python analysis.py --zones data/zone_a data/zone_b data/zone_c --out figures/
+python analysis.py --zones data/carrefour_pistes data/damsplatz --names "Carrefour des pistes" "Place du Dam" --out figures/
 
 # évaluation sur le jeu annoté
 python evaluate.py --zone data/carrefour_pistes --split test
@@ -81,5 +81,5 @@ section 5 du plan de travail.
 | 3. Détection | Fonctionnelle (YOLO, regroupement des classes, conducteurs de deux-roues) |
 | 3. Stationnés | Seulement `--parked none` ; stratégies `geometry` et `clip` à coder (R4) |
 | 4. Rapport | Fonctionnel |
-| 5. Analyse | À coder (R5) |
+| 5. Analyse | Fonctionnelle : indicateurs, bootstrap par séquence, khi-deux, graphiques |
 | Évaluation | À coder (R4) |
