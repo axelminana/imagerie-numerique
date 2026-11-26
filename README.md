@@ -65,6 +65,18 @@ profil réseau, définir la variable `HF_HOME` avant de lancer, par exemple
 moins 10 Go en float16 ; avec moins, mettre `BLIP2_LOAD_8BIT = True` dans
 `config.py` et installer `bitsandbytes`.
 
+## Annotation à la main
+
+```bash
+# répartir les images téléchargées entre les annotateurs (dossier annotation/)
+python prepare_annotation.py --zones data/carrefour_pistes data/damsplatz --annotateurs A B C
+
+# une fois les feuilles remplies : les regrouper dans annotations/annotations.csv
+python prepare_annotation.py --merge
+```
+
+Les règles d'annotation sont dans `annotation/consigne.txt`.
+
 ## Organisation
 
 | Fichier | Étape | Rôle |

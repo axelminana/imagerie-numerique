@@ -11,3 +11,4 @@ Chaque usage est consigné ici au moment où il a lieu.
 | 05/11/2026 | Axel | Claude (Anthropic) | Implémentation de la détection YOLO (`detection.py`), du rapport (`report.py`), des versions provisoires `--filter none` et `--parked none`, et de leurs tests | Étapes 3 et 4 |
 | 25/11/2026 | Axel | Claude (Anthropic) | Implémentation de l'analyse statistique et des graphiques (`analysis.py`) et de ses tests (`tests/test_analysis.py`) | Étape 5 : analyse |
 | 25/11/2026 | Axel | Claude (Anthropic) | Préparation des diapositives de la revue de projet du 26/11 | Revue de projet |
+| 26/11/2026 | Axel | Claude (Anthropic) | Script de préparation et de regroupement des annotations (`prepare_annotation.py`), consigne d'annotation et tests | Évaluation : jeu annoté |

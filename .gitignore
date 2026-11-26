@@ -27,3 +27,6 @@ venv/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Dossiers de travail des annotateurs (images et feuilles en cours)
+annotation/
