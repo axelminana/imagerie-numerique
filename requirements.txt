@@ -21,6 +21,7 @@ torch>=2.2
 ultralytics>=8.3
 transformers>=4.44
 accelerate>=0.33
+# bitsandbytes   # seulement pour BLIP-2 en 8 bits (BLIP2_LOAD_8BIT = True)
 
 # Tests
 pytest>=8.0

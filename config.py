@@ -45,6 +45,7 @@ FIGURES_DIR = "figures"
 
 METADATA_FILE = "metadata.csv"
 FILTER_FILE = "filter.csv"
+FILTER_VARIANTS_FILE = "filter_variants.csv"
 DETECTIONS_FILE = "detections.csv"
 REPORT_FILE = "report.csv"
 STATS_FILE = "stats.csv"
@@ -106,12 +107,19 @@ BLIP2_PROMPTS: list[str] = [
     "Question: Was this photo taken from a street or a sidewalk? Answer yes or no. Answer:",
 ]
 BLIP2_REJECT_PROMPT = "Question: Is this a parking lot? Answer yes or no. Answer:"
+BLIP2_PROMPT_INDEX = 0                      # question utilisée par filter.csv (à choisir)
+BLIP2_USE_REJECT = False                    # ajouter la question de rejet (variante à tester)
+BLIP2_LOAD_8BIT = False                     # True si le GPU a moins de 10 Go (bitsandbytes)
+BLIP2_MAX_NEW_TOKENS = 5                    # réponse courte : "yes" ou "no"
 
 CLIP_MODEL = "openai/clip-vit-large-patch14"
+# Les descriptions positives décrivent le point de vue, pas la présence de trafic :
+# une route vide doit être gardée (elle compte avec des zéros dans le rapport).
 CLIP_POSITIVE_PROMPTS: list[str] = [
-    "a photo of a street with traffic taken from the road",
+    "a photo of a street taken from the road",
     "a city street seen from the sidewalk",
     "a road seen from a car dashboard camera",
+    "an empty road with no cars",
 ]
 CLIP_NEGATIVE_PROMPTS: list[str] = [
     "a parking lot full of parked cars",
@@ -120,6 +128,7 @@ CLIP_NEGATIVE_PROMPTS: list[str] = [
     "a blurry photo",
 ]
 CLIP_KEEP_THRESHOLD = 0.5                   # à régler
+VLM_BATCH_SIZE = 8                          # images par lot pour BLIP-2 et CLIP
 DEFAULT_FILTER = "none"                     # provisoire : "blip2" ou "clip" quand R2 les aura codés
 
 # ---------------------------------------------------------------------------

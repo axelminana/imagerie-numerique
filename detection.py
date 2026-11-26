@@ -15,6 +15,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import config
+from utils import resolve_device as _resolve_device
 
 log = logging.getLogger(__name__)
 
@@ -74,16 +75,6 @@ def mark_riders(detections: list[dict],
             detections[p]["is_rider"] = True
             capacity[v] -= 1
     return detections
-
-
-def _resolve_device(device: str) -> str:
-    """Repasse sur le CPU, avec un avertissement, si aucun GPU n'est disponible."""
-    if device == "cuda":
-        import torch
-        if not torch.cuda.is_available():
-            log.warning("Aucun GPU CUDA détecté : détection sur CPU (plus lente)")
-            return "cpu"
-    return device
 
 
 def _load_model(model_path: str):
